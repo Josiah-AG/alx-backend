@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-"""0-simple_helper_function module
 """
+Deletion-resilient hypermedia pagination
+"""
+
 import csv
 import math
-from typing import List, Tuple
-
-
-def index_range(page: int, page_size: int) -> Tuple[int, int]:
-    """index_range function
-
-    Args:
-        page (int): page number
-        page_size (int): page size
-
-    Returns:
-        Tuple: Tuple of start and end index
-    """
-    return ((page - 1) * page_size, page * page_size)
+from typing import List, Dict
 
 
 class Server:
@@ -26,6 +15,7 @@ class Server:
 
     def __init__(self):
         self.__dataset = None
+        self.__indexed_dataset = None
 
     def dataset(self) -> List[List]:
         """Cached dataset
@@ -38,18 +28,42 @@ class Server:
 
         return self.__dataset
 
-    def get_page(self, page: int = 1, page_size: int = 10) -> List[List]:
-        """get_page function
+    def indexed_dataset(self) -> Dict[int, List]:
+        """Dataset indexed by sorting position, starting at 0
+        """
+        if self.__indexed_dataset is None:
+            dataset = self.dataset()
+            truncated_dataset = dataset[:1000]
+            self.__indexed_dataset = {
+                i: dataset[i] for i in range(len(dataset))
+            }
+        return self.__indexed_dataset
+
+    def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
+        """get_hyper_index function
 
         Args:
-            page (int, optional): page number. Defaults to 1.
+            index (int, optional): index. Defaults to None.
             page_size (int, optional): page size. Defaults to 10.
 
         Returns:
-            List[List]: list of lists containing the appropriate
+            Dict: dictionary
         """
-        assert type(page) == int and page > 0
-        assert type(page_size) == int and page_size > 0
-
-        start, end = index_range(page, page_size)
-        return self.dataset()[start:end]
+        assert type(index) == int
+        assert type(page_size) == int
+        dataset = self.indexed_dataset()
+        size = len(dataset)
+        assert 0 <= index < size
+        data = []
+        next = index
+        for _ in range(page_size):
+            while not dataset.get(next):
+                next += 1
+            data.append(dataset.get(index))
+            next += 1
+        return {
+            'index': index,
+            'data': data,
+            'page_size': page_size,
+            'next_index': next,
+        }
